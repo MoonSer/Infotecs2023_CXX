@@ -8,11 +8,13 @@ set(SOURCES main.cpp
             include/UserInputController.hpp
             include/ServerController.hpp
             include/Converter.hpp
+            include/Socket.hpp
 
             src/Buffer.cpp
             src/UserInputController.cpp
             src/ServerController.cpp
-            src/Converter.cpp)
+            src/Converter.cpp
+            src/Socket.cpp)
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 target_include_directories(${PROJECT_NAME} PRIVATE include)
