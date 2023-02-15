@@ -1,6 +1,10 @@
 #include "ServerController.hpp"
-
+#include <iostream>
 ServerController::ServerController(std::reference_wrapper<Buffer> buffer) : m_buffer(buffer) {}
+
+ServerController::~ServerController() {
+    this->stop();
+}
 
 void ServerController::start() {
     // Только один поток ServerController::_start возможен!

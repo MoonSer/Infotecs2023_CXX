@@ -27,7 +27,7 @@ void UserInputController::processString(const std::string &userInput) {
     }
 
     // Конвертируем нашу строку в вектор чисел
-    auto convertedToInts = this->convertToNumbers(userInput);
+    auto convertedToInts = Converter::safeStrToNumbers(userInput);
     if (!convertedToInts.has_value()) {
         this->m_writeDevice << "String is not valid.\n";
         return;
@@ -45,16 +45,6 @@ void UserInputController::processString(const std::string &userInput) {
 
     this->m_buffer.get().pushData(std::move(convertedToStr), std::move(convertedToInts.value()));
 }
-
-std::optional<std::vector<short>> UserInputController::convertToNumbers(const std::string &userInput) const noexcept {
-    try {
-        return Converter::strToInts(userInput);
-    }catch (std::exception &e) {
-        this->m_writeDevice << "Exception: " << e.what() << "\n";
-        return std::nullopt;
-    }
-}
-
 
 bool UserInputController::validateString(const std::string &userInput) const {
     for (auto &validator : this->m_validators)

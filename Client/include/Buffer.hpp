@@ -41,8 +41,8 @@ class Buffer {
         
         UserInputData pullData();
 
-        inline std::size_t size() const noexcept;
-        inline void wakeUpOne();
+        std::size_t size() const noexcept;
+        void wakeUpOne();
 
     private:
         std::mutex m_mutex;

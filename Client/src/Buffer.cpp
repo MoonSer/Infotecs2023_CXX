@@ -34,6 +34,6 @@ std::size_t Buffer::size() const noexcept {
     return this->m_data.size();
 }
 
-inline void Buffer::wakeUpOne() {
+void Buffer::wakeUpOne() {
     this->m_conditionVariable.notify_all();
 }
