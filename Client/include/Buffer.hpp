@@ -8,21 +8,32 @@
 // Представляет собой "фрейм" буфера
 class UserInputData {
     public:
-        UserInputData(std::string && str, std::vector<short> &&numbers) noexcept : stringData(std::move(str)), numberedData(std::move(numbers)) {}
+        UserInputData(std::string && str, std::vector<short> &&numbers) noexcept 
+            : m_stringData(std::move(str)), m_numberedData(std::move(numbers)) {}
+        
         UserInputData(UserInputData && user) {
-            this->stringData.swap(user.stringData);
-            this->numberedData.swap(user.numberedData);
+            this->m_stringData.swap(user.m_stringData);
+            this->m_numberedData.swap(user.m_numberedData);
         }
 
+        
         inline const std::string &string() const
-            { return this->stringData; }
+            { return this->m_stringData; }
         
         inline const std::vector<short> &numbers() const
-            { return this->numberedData; }
+            { return this->m_numberedData; }
+        
+        inline const int getSum() const{
+            int sum = 0;
+            for (const auto &value : this->m_numberedData)
+                sum += value;
+
+            return sum;
+        }
 
     private:
-        std::string stringData;
-        std::vector<short> numberedData;
+        std::string m_stringData;
+        std::vector<short> m_numberedData;
 
 
     private:

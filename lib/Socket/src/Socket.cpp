@@ -194,7 +194,7 @@ bool Socket::sendAll(const std::string &message) {
         int currentSended = send(this->m_sock, message.c_str()+bytesTotalSend, message.size()-bytesTotalSend, 0);
 
         int error = WSAGetLastError();
-        if (currentSended == -1 || error == WSAENETRESET || error == WSAECONNRESET) {
+        if (currentSended == -1 && ( error == WSAENETRESET || error == WSAECONNRESET)){ 
             this->m_connected = false;
             return false;
         }

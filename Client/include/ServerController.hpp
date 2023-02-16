@@ -4,10 +4,11 @@
 #include "Buffer.hpp"
 #include "Socket.hpp"
 #include <thread>
+#include <ostream>
 
 class ServerController {
     public:
-        ServerController(std::reference_wrapper<Buffer> buffer);
+        ServerController(std::ostream &outStream, std::reference_wrapper<Buffer> buffer);
         ~ServerController();
 
         void start();
@@ -16,10 +17,14 @@ class ServerController {
 
     private:
         void _start();
+        void initializeSocket();
+        void processEvent(const UserInputData &data);
+        void printPulledData(const UserInputData &data);
     
     private:
         std::thread m_workThread;
         std::reference_wrapper<Buffer> m_buffer;
+        std::ostream &m_writeStream;
         Socket m_sock;
         bool m_inWork;
 };

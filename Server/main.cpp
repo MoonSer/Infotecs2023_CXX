@@ -33,6 +33,7 @@ class Server {
             auto data = socket.readAll();
                     
             if (data.has_value()) {
+                std::cout << "Readed: " << data.value() << "\n";
                 if (this->validateMessage(data.value()) == true)
                     std::cout << "Message validated: \"" + data.value() + "\"\n";
             }
