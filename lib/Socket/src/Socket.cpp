@@ -1,12 +1,12 @@
 #include "Socket.hpp"
 
-inline void NetworkHelper::throwError(const std::string &str) {
+void NetworkHelper::throwError(const std::string &str) {
     if (str.empty())
         throw std::runtime_error("Error: " + NetworkHelper::getStrError());
     throw std::runtime_error("Error: " + str);
 }
 
-inline std::string NetworkHelper::getStrError() {
+const std::string NetworkHelper::getStrError() noexcept {
 #ifdef WIN32
         static char message[256] = {0};
         FormatMessage(
@@ -20,19 +20,18 @@ inline std::string NetworkHelper::getStrError() {
 #endif
 }
 
-inline std::pair<std::string, std::string> NetworkHelper::splitIpPort(const std::string &ipPort) {
+std::pair<std::string, std::string> NetworkHelper::splitIpPort(const std::string &ipPort) noexcept {
     auto doubleDotPos = ipPort.find(':');
     return {ipPort.substr(0, doubleDotPos), ipPort.substr(doubleDotPos+1)};
 }
 
-inline int NetworkHelper::portToInt(const std::string &port) {
+int NetworkHelper::portToInt(const std::string &port) {
     try{
         return std::stoi(port);
     }catch(std::exception &e) {
-        throw std::invalid_argument("Error: can't convert to int - \"" + port + "\"");
+        throw std::invalid_argument("NetworkHelper::portToInt() - Error: can't convert to int - \"" + port + "\"");
     }
 }
-
 
 
 
@@ -55,17 +54,24 @@ void Socket::WSAClean() {
 Socket::Socket() : m_connected(true) {
 #ifdef WIN32
     if (!Socket::m_WSAInitialized)
-        throw std::runtime_error("WSAData not initialized. Please, use Socket::WSAInitialize()");
+        throw std::runtime_error("Socket::Socket() - Error: WSAData not initialized. Please, use Socket::WSAInitialize()");
 #endif
     this->initialize();
 }
 
 Socket::Socket(Socket &&sock) {
-    std::swap(this->m_sock, sock.m_sock);
+
+    this->m_sock = sock.m_sock;
+    sock.m_sock = -1;
+    
+    std::swap(this->m_connected, sock.m_connected);
 }
 
 Socket &Socket::operator=(Socket &&sock) {
-    std::swap(this->m_sock, sock.m_sock);
+    this->m_sock = sock.m_sock;
+    sock.m_sock = -1;
+    
+    std::swap(this->m_connected, sock.m_connected);
     return *this;
 }
 
@@ -74,18 +80,33 @@ Socket::Socket(SOCKET socket, bool isConnected) : m_sock(socket), m_connected(is
     this->enableKeepAlive();
 }
 #else
-Socket::Socket(int socket, bool isConnected) : m_sock(socket), m_connected(isConnected) {
+Socket::Socket(int socket, bool isConnected) 
+    : m_sock(socket), m_connected(isConnected) {
     this->enableKeepAlive();
 }
 #endif
 
-Socket::~Socket() {
-    this->cleanup();
+Socket::~Socket() 
+    { this->cleanup(); }
+
+bool Socket::isConnected() const noexcept { 
+    int error_code;
+    socklen_t error_code_size = sizeof(error_code);
+    getsockopt(this->m_sock, SOL_SOCKET, SO_ERROR, &error_code, &error_code_size);
+    return error_code == 0 && !this->isEConnectionDrop() && this->m_connected;
 }
 
-bool Socket::isConnected() const {
-    return this->m_connected;
-}
+bool Socket::isValid() const noexcept 
+    { return this->m_sock > 0; }
+
+#ifdef WIN32
+SOCKET Socket::get() const noexcept
+#else
+int Socket::get() const noexcept
+#endif
+    { return this->m_sock; }
+
+
 
 void Socket::initialize() {
     this->m_sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -95,15 +116,43 @@ void Socket::initialize() {
     this->enableKeepAlive();
 }
 
-void Socket::cleanup() {
+void Socket::cleanup() noexcept {
+    if (this->isValid()) {
 #ifdef WIN32
-    closesocket(this->m_sock);
+        closesocket(this->m_sock);
 #else 
-    close(this->m_sock);
+        close(this->m_sock);
+#endif
+    }
+}
+
+bool Socket::isHasErrors() const noexcept {
+#ifdef WIN32
+    return WSAGetLastError() != 0;
+#else
+    return errno != 0;
 #endif
 }
 
-bool Socket::setNonBlocking(bool yes) {
+bool Socket::isEAgain() const noexcept {
+#ifdef WIN32
+    int error = WSAGetLastError();
+    return error == WSAEWOULDBLOCK || error == WSAENOTSOCK;
+#else
+    return errno == EAGAIN;
+#endif
+}
+
+bool Socket::isEConnectionDrop() const noexcept {
+#ifdef WIN32
+    auto error = return WSAGetLastError();
+    return error == WSAENETRESET || error == WSAECONNRESET;
+#else
+    return errno == ECONNABORTED || errno == ENOTCONN || errno == ECONNREFUSED || errno == ECONNABORTED;
+#endif
+}
+
+bool Socket::setNonBlocking(bool yes) noexcept {
     unsigned long enabled = yes;
 #ifdef WIN32
    return ioctlsocket(this->m_sock, FIONBIO, &enabled) == 0;
@@ -112,32 +161,29 @@ bool Socket::setNonBlocking(bool yes) {
 #endif
 }
 
-void Socket::enableKeepAlive() {
+bool Socket::enableKeepAlive() noexcept {
     int flag = 1;
-    if (setsockopt(this->m_sock, SOL_SOCKET, SO_KEEPALIVE, reinterpret_cast<char *>(&flag), sizeof(flag)) != 0)
-        NetworkHelper::throwError("Can't enable keep-alive");
+    return setsockopt(this->m_sock, SOL_SOCKET, SO_KEEPALIVE, reinterpret_cast<char *>(&flag), sizeof(flag)) != 0;
 }
 
-
-
 bool Socket::connectTo(const std::string &ipPort) {
-    auto [ip, portStr] = NetworkHelper::splitIpPort(ipPort);    
+    auto [ip, portStr] = NetworkHelper::splitIpPort(ipPort);
     return this->connectTo(ip, NetworkHelper::portToInt(portStr));
 }
 
-bool Socket::connectTo(const std::string &ip, unsigned int port) {   
+#include <iostream>
+bool Socket::connectTo(const std::string &ip, unsigned int port) noexcept {
     struct sockaddr_in addr;
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
 
     inet_pton(AF_INET, ip.c_str(), &addr.sin_addr);
 
-    
-    if (connect(this->m_sock, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) != 0) 
+    if (connect(this->m_sock, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) != 0) {
         return false;
-    
+    }
     this->m_connected = true;
-    
+    std::cout << "Connected..." << this->isConnected() << " " << errno << " " << strerror(errno) << "\n";
     return true;
 }
 
@@ -148,7 +194,7 @@ bool Socket::bindTo(const std::string &ipPort) {
     return this->bindTo(ip, NetworkHelper::portToInt(portStr));
 }
 
-bool Socket::bindTo(const std::string &ip, unsigned int port) {
+bool Socket::bindTo(const std::string &ip, unsigned int port) noexcept {
     sockaddr_in server;
     
     server.sin_family = AF_INET;
@@ -158,7 +204,7 @@ bool Socket::bindTo(const std::string &ip, unsigned int port) {
     return (bind(this->m_sock, reinterpret_cast<sockaddr *>(&server) , sizeof(server)) == 0);
 }
 
-bool Socket::bindTo(unsigned int port) {
+bool Socket::bindTo(unsigned int port) noexcept {
     sockaddr_in server;
     
     server.sin_family = AF_INET;
@@ -170,20 +216,19 @@ bool Socket::bindTo(unsigned int port) {
 
 
 
-void Socket::startListen(int count) {
-    listen(this->m_sock, count);
+bool Socket::startListen(int count) noexcept {
+    return (listen(this->m_sock, count) == 0);
 }
 
 
-
-std::optional<Socket> Socket::tryAccept() {    
-    auto ret = accept(this->m_sock, nullptr, nullptr);
-    
-    if (WSAGetLastError() == WSAEWOULDBLOCK)
-        return std::nullopt;
-    
-    if (WSAGetLastError() != 0)
-        throw std::runtime_error(NetworkHelper::getStrError());
+std::optional<Socket> Socket::tryAccept() {
+    int ret = accept(this->m_sock, nullptr, nullptr);
+    if (ret == -1) {
+        if (this->isEAgain())
+            return std::nullopt;
+        // Если не EAGAIN (WSAEWOULDBLOCK) и accept вернула -1 -> возникла иная ошибка
+        NetworkHelper::throwError();
+    }
     
     return Socket(ret, true);
 }
@@ -191,13 +236,16 @@ std::optional<Socket> Socket::tryAccept() {
 bool Socket::sendAll(const std::string &message) {
     int bytesTotalSend = 0;
     while(bytesTotalSend < message.size()) {
+        
         int currentSended = send(this->m_sock, message.c_str()+bytesTotalSend, message.size()-bytesTotalSend, 0);
-
-        int error = WSAGetLastError();
-        if (currentSended == -1 && ( error == WSAENETRESET || error == WSAECONNRESET)){ 
+        if (!this->isConnected()){ 
             this->m_connected = false;
             return false;
         }
+
+        if (currentSended == -1)
+            NetworkHelper::throwError();
+
         
         bytesTotalSend += currentSended;
     }
@@ -205,21 +253,24 @@ bool Socket::sendAll(const std::string &message) {
     return true; 
 }
 
+
 std::optional<std::string> Socket::readAll() {
     std::string readedString;
     int bytesReaded;
     do {
         char buf[1024];
         bytesReaded = recv(this->m_sock, buf, 1024, 0);
+        if ((bytesReaded == -1 && !this->isConnected()) || bytesReaded == 0) {
+            this->m_connected = false;
+            return std::nullopt;
+        }
 
-        int error = WSAGetLastError();
         if (bytesReaded == -1) {
-            if  (error == WSAENETRESET || error == WSAECONNRESET) {
-                this->m_connected = false;
-                return std::nullopt;
-            }else if (error == WSAEWOULDBLOCK || error == WSAENOTSOCK) {
+            if (this->isEAgain())
                 return readedString.empty() ? std::nullopt : std::optional(readedString);
-            }
+            
+            // Если не EAGAIN (WSAEWOULDBLOCK) и recv вернула -1 -> возникла иная ошибка
+            NetworkHelper::throwError();
         }
         
         readedString.append(buf, bytesReaded);

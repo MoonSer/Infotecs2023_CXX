@@ -1,7 +1,13 @@
 #include "ServerController.hpp"
 #include <iostream>
 
-ServerController::ServerController(std::ostream &writeStream, std::reference_wrapper<Buffer> buffer) : m_buffer(buffer), m_writeStream(writeStream) {}
+ServerController::ServerController(std::ostream &writeStream, 
+                                   std::reference_wrapper<Buffer> buffer, 
+                                   const std::string &serverAddress, 
+                                   std::chrono::milliseconds reconnectTimeout) 
+    : m_writeStream(writeStream), m_buffer(buffer), 
+      m_serverAddress(serverAddress), m_reconnectTimeout(reconnectTimeout), 
+      m_inWork(false) {}
 
 ServerController::~ServerController() {
     this->stop();
@@ -13,69 +19,72 @@ ServerController::~ServerController() {
 void ServerController::start() {
     // Только один поток ServerController::_start возможен!
     if (this->m_workThread.joinable())
-        throw std::runtime_error("ServerController thread already in work!");
-    std::cout << "ServerController(): started\n";
+        this->stop();
+    
     this->m_workThread = std::thread(&ServerController::_start, this);
+    this->setInWork(true);
 }
 
 void ServerController::stop() noexcept {
-    // Для остановки - устанавливаем флаг и пробуждаем поток через буфер (костыльненько это делать через буфер).
-    this->m_inWork = false;
+    // Для остановки - устанавливаем флаг и пробуждаем поток через буфер (правда костыльненько это делать через буфер).
+    this->setInWork(false);
     this->m_buffer.get().wakeUpOne();
+    
+    if (this->m_workThread.joinable())
+        this->m_workThread.join();
+}
+
+bool ServerController::inWork() const noexcept
+    { return this->m_inWork; }
+
+void ServerController::setInWork(bool inWork) noexcept {
+    this->m_inWork = inWork;
 }
 
 void ServerController::_start() {
-    std::cout << "ServerController(): initializeSocket\n";
     this->initializeSocket();
 
     Buffer &buffer = this->m_buffer.get();
     while (true) {
-        std::cout << "ServerController(): NewIteration: check buffer size" << buffer.size() << "\n";
         if (buffer.size() == 0)
             buffer.waitData();
-        std::cout << "ServerController(): Waked up!\n";
-        // inWork - флаг завершения программы, нужен для корректного окончания потока
-        if (this->m_inWork == false)
-            break;
-        
-        if (this->m_inWork == true)
-            std::cout << "SDdsadsadsa " << this->m_inWork << "\n";
-        if (this->m_inWork == false)
-            std::cout << "fffffffffff " << this->m_inWork << "\n";
-        std::cout << this->m_inWork << "\n";
-        while (buffer.size() > 0 && this->m_inWork == true) {
-            std::cout << "=========================================\n";
-            UserInputData data = buffer.pullData();
-            std::cout << "NewEvent: " << data.string() << "\n";
-            this->processEvent(data);
+
+        while (buffer.size() > 0 && this->inWork()) {
+            auto data = buffer.front();
+            if (this->processEvent(data))
+                buffer.pop();
         }
+
+        // inWork - флаг завершения программы, нужен для корректного окончания потока
+        if (!this->inWork())
+            break;
     }
 }
 
-void ServerController::processEvent(const UserInputData &data) {
-    this->printPulledData(data);
+bool ServerController::processEvent(const UserInputData &data) {
+    this->printProcessingData(data);
 
     // Выход из цикла через break, если сконнектился до сервера и отправил
-    while (this->m_inWork == true) {
-        std::cout << "Check connection...\n";
-        while (this->m_sock.connectTo("127.0.0.1:3000") == false && this->m_inWork == true)
-            std::this_thread::sleep_for(std::chrono::seconds(5));
-        
-        std::cout << "Sending...\n";
-        if (this->m_sock.sendAll(std::to_string(data.getSum())) == true)
-            break;
-        
-        std::cout << "ERROR...\n";
-        std::cout << NetworkHelper::getStrError() << "\n";
+    while (this->inWork()) {
+             
+        while (!this->m_sock.isConnected() && this->inWork()) {
+            std::this_thread::sleep_for(this->m_reconnectTimeout);
+            if (this->m_sock.connectTo(this->m_serverAddress))
+                break;
+        }
+        this->m_writeStream << "Sending..." << this->m_sock.isConnected() << " " << errno << " " << strerror(errno) << "\n";    
+        if (this->m_sock.isConnected() && this->m_sock.sendAll(std::to_string(data.getSum()) + "\n"))
+            return true;
     }
+    return false;
 }
 
 void ServerController::initializeSocket() {
     this->m_sock.setNonBlocking();
-    this->m_sock.connectTo("127.0.0.1:3000");
+    this->m_sock.connectTo(this->m_serverAddress);
 }
 
-void ServerController::printPulledData(const UserInputData &data) {
-    this->m_writeStream << data.string() << "\n";
+void ServerController::printProcessingData(const UserInputData &data) const noexcept {
+    this->m_writeStream << "\r" << data.string() << "\n >";
 }
 

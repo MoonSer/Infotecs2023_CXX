@@ -3,28 +3,38 @@
 
 #include "Buffer.hpp"
 #include "Socket.hpp"
+
 #include <thread>
 #include <ostream>
 
 class ServerController {
     public:
-        ServerController(std::ostream &outStream, std::reference_wrapper<Buffer> buffer);
+        ServerController(std::ostream &writeStream, 
+                         std::reference_wrapper<Buffer> buffer, 
+                         const std::string &serverAddress = "127.0.0.1:3000", 
+                         std::chrono::milliseconds reconnectTimeout = std::chrono::seconds(2));
         ~ServerController();
 
         void start();
 
         void stop() noexcept;
 
+        bool inWork() const noexcept;
+        void setInWork(bool inWork) noexcept;
+
     private:
         void _start();
         void initializeSocket();
-        void processEvent(const UserInputData &data);
-        void printPulledData(const UserInputData &data);
+        bool processEvent(const UserInputData &data);
+        void printProcessingData(const UserInputData &data) const noexcept;
     
     private:
         std::thread m_workThread;
-        std::reference_wrapper<Buffer> m_buffer;
         std::ostream &m_writeStream;
+        std::reference_wrapper<Buffer> m_buffer;
+        std::string m_serverAddress;
+        std::chrono::milliseconds m_reconnectTimeout;
+  
         Socket m_sock;
         bool m_inWork;
 };

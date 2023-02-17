@@ -1,0 +1,5 @@
+/home/moonser/projects/cxx/InfotecsCXX2023/build/CMakeFiles/Client.dir
+/home/moonser/projects/cxx/InfotecsCXX2023/build/CMakeFiles/package.dir
+/home/moonser/projects/cxx/InfotecsCXX2023/build/CMakeFiles/package_source.dir
+/home/moonser/projects/cxx/InfotecsCXX2023/build/CMakeFiles/edit_cache.dir
+/home/moonser/projects/cxx/InfotecsCXX2023/build/CMakeFiles/rebuild_cache.dir

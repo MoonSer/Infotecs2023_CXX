@@ -1,0 +1,7 @@
+# ninja log v5
+1	523	1676314389924605914	CMakeFiles/Client.dir/src/Converter.cpp.o	694a8ba086499fc9
+2	548	1676314458837937496	CMakeFiles/Client.dir/main.cpp.o	b17fa281a6ca98a2
+0	870	1676314390271272573	CMakeFiles/Client.dir/src/UserInputController.cpp.o	fa3b1bdd9f76e414
+0	7	0	clean	a31eedcededa8236
+0	449	1676314389851272582	CMakeFiles/Client.dir/src/Buffer.cpp.o	17710b3c617ba50d
+548	609	1676314458901270827	Client	5b9a77eadb4b15f1

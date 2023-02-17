@@ -17,17 +17,16 @@ class UserInputData {
         }
 
         
-        inline const std::string &string() const
+        inline const std::string &string() const noexcept
             { return this->m_stringData; }
         
-        inline const std::vector<short> &numbers() const
+        inline const std::vector<short> &numbers() const noexcept
             { return this->m_numberedData; }
         
-        inline const int getSum() const{
+        inline const int getSum() const noexcept{
             int sum = 0;
             for (const auto &value : this->m_numberedData)
                 sum += value;
-
             return sum;
         }
 
@@ -42,18 +41,21 @@ class UserInputData {
 
 
 
+
 class Buffer {
     public:
         Buffer() = default;
-        void waitData();
+        void waitData() noexcept;
 
         void pushData(std::string &&strData, std::vector<short> &&numbersData, bool wakeUpHandler = true) noexcept;
         void pushData(UserInputData &&data, bool wakeUpHandler = true) noexcept;
         
-        UserInputData pullData();
+        const std::reference_wrapper<const UserInputData> front() const;
+
+        void pop() noexcept;
 
         std::size_t size() const noexcept;
-        void wakeUpOne();
+        void wakeUpOne() noexcept;
 
     private:
         std::mutex m_mutex;

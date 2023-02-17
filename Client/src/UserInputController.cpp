@@ -39,8 +39,7 @@ void UserInputController::processString(const std::string &userInput) {
     std::string convertedToStr = Converter::intsToStr(convertedToInts.value());
     
     // Чистим массив от чётных цифр
-    convertedToInts.value().erase(std::remove_if(convertedToInts.value().begin(), convertedToInts.value().end(), [] (short number) { return number%2; }), convertedToInts.value().end());
-    
+    convertedToInts.value().erase(std::remove_if(convertedToInts.value().begin(), convertedToInts.value().end(), [] (short number) { return number%2 == 0; }), convertedToInts.value().end());
 
 
     this->m_buffer.get().pushData(std::move(convertedToStr), std::move(convertedToInts.value()));

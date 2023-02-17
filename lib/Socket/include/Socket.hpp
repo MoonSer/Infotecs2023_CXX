@@ -11,6 +11,8 @@
     #include <sys/types.h>
     #include <netinet/in.h>
     #include <arpa/inet.h>
+    #include <unistd.h>
+    #include <fcntl.h>
 #endif
 
 #include <string>
@@ -19,10 +21,12 @@
 #include <optional>
 
 namespace NetworkHelper {
-    inline std::string getStrError();
-    inline void throwError(const std::string &str = "");
-    inline std::pair<std::string, std::string> splitIpPort(const std::string &ipPort);
-    inline int portToInt(const std::string &port);
+    const std::string getStrError() noexcept;
+    void throwError(const std::string &str = "");
+    
+    std::pair<std::string, std::string> splitIpPort(const std::string &ipPort) noexcept;
+    
+    int portToInt(const std::string &port);
 };
 
 
@@ -39,25 +43,34 @@ class Socket {
 #endif
         ~Socket();
 
-        bool isConnected() const;
+        bool isConnected() const noexcept;
+        bool isValid() const noexcept;
 
-        bool setNonBlocking(bool yes = true);
-        void enableKeepAlive();
+#ifdef WIN32
+        SOCKET get();
+#else
+        int get() const noexcept;
+#endif
+
+        bool setNonBlocking(bool yes = true) noexcept;
+        bool enableKeepAlive() noexcept;
 
         bool connectTo(const std::string &ipPort);
-        bool connectTo(const std::string &ip, unsigned int port);
+        bool connectTo(const std::string &ip, unsigned int port) noexcept;
 
         bool bindTo(const std::string &ipPort);
-        bool bindTo(const std::string &ip, unsigned int port);
-        bool bindTo(unsigned int port);
+        bool bindTo(const std::string &ip, unsigned int port) noexcept;
+        bool bindTo(unsigned int port) noexcept;
 
-        void startListen(int count = 3);
-
+        bool startListen(int count = 5) noexcept;
+        
         std::optional<Socket> tryAccept();
 
         bool sendAll(const std::string &message);
-
+        
         std::optional<std::string> readAll();
+
+        void cleanup() noexcept;
 
         friend bool operator==(const Socket &l, const Socket &r);
 
@@ -71,7 +84,10 @@ class Socket {
         Socket &operator=(const Socket &) = delete;
 
         void initialize();
-        void cleanup();
+
+        bool isHasErrors() const noexcept;
+        bool isEAgain() const noexcept;
+        bool isEConnectionDrop() const noexcept;
 
 
     private:

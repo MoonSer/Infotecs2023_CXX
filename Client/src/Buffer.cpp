@@ -1,6 +1,6 @@
 #include "Buffer.hpp"
 
-void Buffer::waitData() {
+void Buffer::waitData() noexcept {
     // Не боимся юзать один мьютекс для чтения, записи и ожидания, т.к. выйдя из функции Buffer::waitData(), мьютекс будет разблокирован
     std::unique_lock lock(this->m_mutex);
     this->m_conditionVariable.wait(lock);
@@ -20,20 +20,23 @@ void Buffer::pushData(UserInputData &&data, bool wakeUpHandler) noexcept {
         this->wakeUpOne();
 }
 
-UserInputData Buffer::pullData() {
+const std::reference_wrapper<const UserInputData> Buffer::front() const {
     if (this->m_data.size() == 0)
-        throw std::logic_error("No one event!");
-    std::unique_lock lock(this->m_mutex);
+        throw std::logic_error("Buffer::front() - Error: No one event!");
     
-    UserInputData data = std::move(this->m_data.front());
-    this->m_data.pop();
-    return data;
+    return std::ref(this->m_data.front());
+}
+
+void Buffer::pop() noexcept {
+    std::unique_lock lock(this->m_mutex);
+    if (this->m_data.size() != 0)
+        this->m_data.pop();
 }
 
 std::size_t Buffer::size() const noexcept {
     return this->m_data.size();
 }
 
-void Buffer::wakeUpOne() {
+void Buffer::wakeUpOne() noexcept {
     this->m_conditionVariable.notify_all();
 }

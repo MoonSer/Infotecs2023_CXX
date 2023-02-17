@@ -1,0 +1,22 @@
+[
+{
+  "directory": "/home/moonser/projects/cxx/InfotecsCXX2023/build",
+  "command": "/usr/bin/g++ -I/home/moonser/projects/cxx/InfotecsCXX2023/include -g -o CMakeFiles/Client.dir/main.cpp.o -c /home/moonser/projects/cxx/InfotecsCXX2023/main.cpp",
+  "file": "/home/moonser/projects/cxx/InfotecsCXX2023/main.cpp"
+},
+{
+  "directory": "/home/moonser/projects/cxx/InfotecsCXX2023/build",
+  "command": "/usr/bin/g++ -I/home/moonser/projects/cxx/InfotecsCXX2023/include -g -o CMakeFiles/Client.dir/src/UserInputController.cpp.o -c /home/moonser/projects/cxx/InfotecsCXX2023/src/UserInputController.cpp",
+  "file": "/home/moonser/projects/cxx/InfotecsCXX2023/src/UserInputController.cpp"
+},
+{
+  "directory": "/home/moonser/projects/cxx/InfotecsCXX2023/build",
+  "command": "/usr/bin/g++ -I/home/moonser/projects/cxx/InfotecsCXX2023/include -g -o CMakeFiles/Client.dir/src/Buffer.cpp.o -c /home/moonser/projects/cxx/InfotecsCXX2023/src/Buffer.cpp",
+  "file": "/home/moonser/projects/cxx/InfotecsCXX2023/src/Buffer.cpp"
+},
+{
+  "directory": "/home/moonser/projects/cxx/InfotecsCXX2023/build",
+  "command": "/usr/bin/g++ -I/home/moonser/projects/cxx/InfotecsCXX2023/include -g -o CMakeFiles/Client.dir/src/Converter.cpp.o -c /home/moonser/projects/cxx/InfotecsCXX2023/src/Converter.cpp",
+  "file": "/home/moonser/projects/cxx/InfotecsCXX2023/src/Converter.cpp"
+}
+]
