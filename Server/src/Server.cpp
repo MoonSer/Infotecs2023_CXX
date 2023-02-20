@@ -1,52 +1,98 @@
 #include "Server.hpp"
 
-Server::Server(std::ostream &writeStream, int port) : m_writeStream(writeStream) {
-    this->m_sock.setNonBlocking();
-    this->m_sock.enableKeepAlive();
-    if (!this->m_sock.bindTo(port))
-        throw std::runtime_error(strerror(errno));
-    this->m_sock.startListen();
-}
+Server::Server(std::ostream &writeStream, unsigned short port) 
+    : m_writeStream(writeStream), m_inWork(false) {  this->_initializeSocket(port); }
 
+Server::~Server() {
+#ifdef WIN32
+    Socket::WSACleanup();
+#endif
+}
 
 void Server::loop() {
-    while (true){
-        this->tryAcceptConnection();
-        // this->m_writeStream << "Base: " << this->m_sock.get() << "\n";
-        // this->m_writeStream << "Clients:" << "\n";
-        for (auto iter = this->m_clients.begin(); iter != this->m_clients.end();) {
-            // this->m_writeStream << iter->get() << "\n";
+    this->m_inWork = true;
+    while (this->m_inWork){
+        std::vector<int> clientsToCloseConnection;
+        int pollSatus = WSAPoll(this->m_sockets.data(), this->m_sockets.size(), -1);
 
-            if (!this->tryReadFrom(std::ref(*iter))) {
-                iter = this->m_clients.erase(iter);
-            }else{
-                ++iter;
-            }
+        if (pollSatus == -1) {
+            this->_cleanup();
+            SocketError::throwError("Server::loop(). Poll errror");
         }
-        
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+        // Новое соединение
+        if (this->m_sockets.at(0).revents & POLLIN)
+            this->_acceptConnection();
+
+
+        // Какой-то из клинетских сокетов готов читать
+        for (auto it = ++this->m_sockets.begin(); it != this->m_sockets.end(); ++it) {
+            if (it->revents == 0)
+                continue;
+
+            else if (it->revents & POLLIN) 
+                if (!this->_readAndProcessFrom(Socket(it->fd)))
+                    clientsToCloseConnection.emplace_back(it->fd);
+            
+            else{
+                clientsToCloseConnection.emplace_back(it->fd);
+                continue;
+            }            
+        }
+        // Удаляем отключившихся клиентов
+        this->m_sockets.erase(
+            std::remove_if(this->m_sockets.begin(), this->m_sockets.end(), 
+                [clientsToCloseConnection] (const auto &pollSocket) -> bool {
+                    return std::find(clientsToCloseConnection.begin(), clientsToCloseConnection.end(), pollSocket.fd) != clientsToCloseConnection.end();
+                }),
+        this->m_sockets.end());
     }
 }
 
-void Server::tryAcceptConnection() {
-    auto accepted = this->m_sock.tryAccept();
-    if (accepted.has_value()) {
 
-        accepted.value().setNonBlocking();
-        this->m_clients.push_back(std::move(accepted.value()));
-    }
+void Server::addValidator(ValidatorType validator) noexcept {
+    this->m_validators.emplace_back(validator);
 }
 
-bool Server::tryReadFrom(Socket &socket) {
-    auto readedFromSocket = socket.readAll();
 
-    if (readedFromSocket.has_value())
-        this->processData(readedFromSocket.value());
-    
-    if (!socket.isConnected())
+void Server::_initializeSocket(unsigned short port) {
+#ifdef WIN32
+    Socket::WSAStartup();
+#endif
+    Socket serverSock;
+    serverSock.setNonBlocking(true);
+    serverSock.bindOrThrow(3000);
+    serverSock.listenOrThrow(3);
+    this->m_sockets.emplace_back(pollfd{serverSock.getRaw(), POLLIN});
+}
+
+
+void Server::_acceptConnection() {
+    Socket serverSock(this->m_sockets.front().fd);
+    do {
+        auto client = serverSock.accept();
+        if (!client.has_value()) {
+            if (SocketError::isEAgain())
+                break;
+            
+            SocketError::throwError("Server::_acceptConnection()");
+        }
+
+        this->m_sockets.emplace_back(pollfd{client.value().getRaw(), POLLIN});
+    }while (true);
+}
+
+bool Server::_readAndProcessFrom(Socket &&clientSock) {
+    auto readedData = clientSock.recv();
+    if (!readedData.has_value())
         return false;
-    
+    this->processData(readedData.value());
     return true;
+}
+
+void Server::_cleanup() {
+    for (const auto &pollfdSock : this->m_sockets)
+        Socket(pollfdSock.fd).cleanup();
 }
 
 void Server::processData(const std::string &data) const noexcept {
@@ -58,22 +104,14 @@ void Server::processData(const std::string &data) const noexcept {
             this->m_writeStream << "Message validated: \"" + currentString + "\"\n";
         
         lastDelimIndex = data.find('\n', lastDelimIndex+1);
+        break;
     }
 
 }
 
-bool Server::validateMessage(const std::string &message) const noexcept {
-    auto convertedToInt = this->strToInt(message);
-
-    if (message.size() > 1 && convertedToInt.has_value() && convertedToInt.value() % 32 == 0)
-        return true;
-    return false;
-}
-
-std::optional<int> Server::strToInt(const std::string &str) const noexcept {
-    try{
-        return std::stoi(str);
-    }catch(...) {
-        return std::nullopt;
-    }
+bool Server::validateMessage(const std::string &message) const {
+    for (auto &validator : this->m_validators)
+        if (!validator(message))
+            return false;
+    return true;
 }

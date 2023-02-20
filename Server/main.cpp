@@ -1,17 +1,15 @@
 #include <iostream>
-
 #include "Server.hpp"
 
-
 int main() {
-#ifdef WIN32
-    Socket::WSAInitialize();
-#endif
-    
     Server serv(std::cout);
+    serv.addValidator([] (const std::string &message) { return message.size() > 1;});
+    serv.addValidator([] (const std::string &message) { 
+        try{
+            return std::stoi(message) % 32 == 0;
+        }catch (...) {
+            return false;
+        }
+    });
     serv.loop();
-    
-#ifdef WIN32
-    Socket::WSAClean();
-#endif
 }

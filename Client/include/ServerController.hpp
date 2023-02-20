@@ -7,16 +7,21 @@
 #include <thread>
 #include <ostream>
 
+struct ServerAddress {
+    std::string ip;
+    unsigned short port;
+};
+
 class ServerController {
     public:
         ServerController(std::ostream &writeStream, 
                          std::reference_wrapper<Buffer> buffer, 
-                         const std::string &serverAddress = "127.0.0.1:3000", 
-                         std::chrono::milliseconds reconnectTimeout = std::chrono::seconds(2));
+                         const std::string &ip = "127.0.0.1",
+                         unsigned short port = 3000, 
+                         std::chrono::milliseconds reconnectTimeout = std::chrono::seconds(5));
         ~ServerController();
 
         void start();
-
         void stop() noexcept;
 
         bool inWork() const noexcept;
@@ -24,15 +29,13 @@ class ServerController {
 
     private:
         void _start();
-        void initializeSocket();
-        bool processEvent(const UserInputData &data);
-        void printProcessingData(const UserInputData &data) const noexcept;
+        bool _processEvent(const UserInputData &data);
     
     private:
         std::thread m_workThread;
         std::ostream &m_writeStream;
         std::reference_wrapper<Buffer> m_buffer;
-        std::string m_serverAddress;
+        ServerAddress m_serverAddress;
         std::chrono::milliseconds m_reconnectTimeout;
   
         Socket m_sock;

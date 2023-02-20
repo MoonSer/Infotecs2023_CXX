@@ -11,9 +11,9 @@ class UserInputData {
         UserInputData(std::string && str, std::vector<short> &&numbers) noexcept 
             : m_stringData(std::move(str)), m_numberedData(std::move(numbers)) {}
         
-        UserInputData(UserInputData && user) {
-            this->m_stringData.swap(user.m_stringData);
-            this->m_numberedData.swap(user.m_numberedData);
+        UserInputData(UserInputData && userData) {
+            this->m_stringData.swap(userData.m_stringData);
+            this->m_numberedData.swap(userData.m_numberedData);
         }
 
         
