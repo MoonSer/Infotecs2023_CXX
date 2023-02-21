@@ -13,8 +13,8 @@ void Server::loop() {
     this->m_inWork = true;
     while (this->m_inWork){
         std::vector<int> clientsToCloseConnection;
-        int pollSatus = WSAPoll(this->m_sockets.data(), this->m_sockets.size(), -1);
-
+        int pollSatus = poll(this->m_sockets.data(), this->m_sockets.size(), -1);
+        
         if (pollSatus == -1) {
             this->_cleanup();
             SocketError::throwError("Server::loop(). Poll errror");
@@ -24,21 +24,20 @@ void Server::loop() {
         if (this->m_sockets.at(0).revents & POLLIN)
             this->_acceptConnection();
 
-
         // Какой-то из клинетских сокетов готов читать
         for (auto it = ++this->m_sockets.begin(); it != this->m_sockets.end(); ++it) {
-            if (it->revents == 0)
+
+            if (it->revents == 0){
                 continue;
 
-            else if (it->revents & POLLIN) 
-                if (!this->_readAndProcessFrom(Socket(it->fd)))
+            }else if (it->revents & POLLIN) {
+                if (!this->_readAndProcessFrom(Socket(it->fd))) 
                     clientsToCloseConnection.emplace_back(it->fd);
-            
-            else{
+            }else{
                 clientsToCloseConnection.emplace_back(it->fd);
-                continue;
-            }            
+            }
         }
+
         // Удаляем отключившихся клиентов
         this->m_sockets.erase(
             std::remove_if(this->m_sockets.begin(), this->m_sockets.end(), 
@@ -60,7 +59,8 @@ void Server::_initializeSocket(unsigned short port) {
     Socket::WSAStartup();
 #endif
     Socket serverSock;
-    serverSock.setNonBlocking(true);
+    if (!serverSock.setNonBlocking(true) || !serverSock.setReuseAddr(true))
+        SocketError::throwError("Server::_initializeSocket()");
     serverSock.bindOrThrow(3000);
     serverSock.listenOrThrow(3);
     this->m_sockets.emplace_back(pollfd{serverSock.getRaw(), POLLIN});
@@ -71,6 +71,7 @@ void Server::_acceptConnection() {
     Socket serverSock(this->m_sockets.front().fd);
     do {
         auto client = serverSock.accept();
+        
         if (!client.has_value()) {
             if (SocketError::isEAgain())
                 break;
@@ -78,14 +79,17 @@ void Server::_acceptConnection() {
             SocketError::throwError("Server::_acceptConnection()");
         }
 
+        client.value().setNonBlocking(true);
+
         this->m_sockets.emplace_back(pollfd{client.value().getRaw(), POLLIN});
     }while (true);
 }
 
 bool Server::_readAndProcessFrom(Socket &&clientSock) {
     auto readedData = clientSock.recv();
-    if (!readedData.has_value())
+    if (!readedData.has_value()) 
         return false;
+
     this->processData(readedData.value());
     return true;
 }
@@ -93,6 +97,9 @@ bool Server::_readAndProcessFrom(Socket &&clientSock) {
 void Server::_cleanup() {
     for (const auto &pollfdSock : this->m_sockets)
         Socket(pollfdSock.fd).cleanup();
+#ifdef WIN32
+    Socket::WSACleanup();
+#endif
 }
 
 void Server::processData(const std::string &data) const noexcept {

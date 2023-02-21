@@ -54,15 +54,17 @@ void ServerController::_start() {
 }
 
 bool ServerController::_processEvent(const UserInputData &data) {
-    this->m_writeStream << "\r" << data.string() << "\n>";
+    this->m_writeStream << "\r" << data.string() << "\n>" << std::flush;
 
     // Выход из цикла через break, если сконнектился до сервера и отправил
     while (this->inWork())  {
         if (this->m_sock.connect(this->m_serverAddress.ip, this->m_serverAddress.port))
             break;
-        
         std::this_thread::sleep_for(this->m_reconnectTimeout);
     }
         
-    return this->m_sock.send(std::to_string(data.getSum()) + "\n");
+    if (this->m_sock.send(std::to_string(data.getSum()) + "\n"))
+        return true;
+
+    return false;
 }

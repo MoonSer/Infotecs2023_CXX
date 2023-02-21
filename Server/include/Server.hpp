@@ -3,6 +3,12 @@
 
 #include "Socket.hpp"
 
+#ifdef WIN32
+    #define poll(x, y, z) (::WSAPoll(x, y, z))
+#else
+    #include <poll.h>
+    #define poll(x, y, z) (::poll(x, y, z))
+#endif
 #include <thread>
 #include <chrono>
 #include <vector>

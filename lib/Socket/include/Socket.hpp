@@ -18,6 +18,7 @@
     #include <arpa/inet.h>
     #include <unistd.h>
     #include <fcntl.h>
+    #include <cstring>
 #endif
 
 #include <string>
@@ -155,6 +156,14 @@ class Socket {
          * @return возвращает true, если режим успешно включен
          */
         bool setKeepAlive(bool status = true) noexcept;
+
+        /**
+         * @brief Включает/отключает возможность выполнять привязку к порту, который (возможно) используется другим сокетом
+         * @param status Включить/отключить SO_REUSEADDR
+         * 
+         * @return возвращает true, если режим успешно включен
+        */
+        bool setReuseAddr(bool status) noexcept;
 
         /**
          * @brief Включает/отключает неблокирующий режим

@@ -130,7 +130,21 @@ void Socket::cleanup() noexcept {
 
 
 bool Socket::setKeepAlive(bool status) noexcept {
-    return setsockopt(this->m_sock, SOL_SOCKET, SO_KEEPALIVE, reinterpret_cast<char *>(&status), sizeof(status)) != 0;
+    int flag = status;
+#ifdef WIN32
+    return setsockopt(this->m_sock, SOL_SOCKET, SO_KEEPALIVE, reinterpret_cast<char *>(&flag), sizeof(status)) == 0;
+#else
+    return setsockopt(this->m_sock, SOL_SOCKET, SO_KEEPALIVE, &flag, sizeof(status)) == 0;
+#endif
+}
+
+bool Socket::setReuseAddr(bool status) noexcept {
+    int flag = status;
+#ifdef WIN32
+    return setsockopt(this->m_sock, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<char *>(&flag), sizeof(flag)) == 0;
+#else
+    return setsockopt(this->m_sock, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag)) == 0;
+#endif    
 }
 
 bool Socket::setNonBlocking(bool status) noexcept {
@@ -139,8 +153,8 @@ bool Socket::setNonBlocking(bool status) noexcept {
 #else
     int flags = fcntl(this->m_sock, F_GETFL, 0);
     if (flags == -1) return false;
-    flags = status ? (flags & ~O_NONBLOCK) : (flags | O_NONBLOCK);
-    return (fcntl(this->m_sock, F_SETFL, flags) == 0)
+    flags = status ? (flags | O_NONBLOCK) : (flags & ~ O_NONBLOCK);
+    return (fcntl(this->m_sock, F_SETFL, flags) == 0);
 #endif
 }
 
@@ -256,11 +270,11 @@ std::optional<std::string> Socket::recv() noexcept {
         char buf[1024];
         try{
             bytesReaded = ::recv(this->m_sock, buf, 1024, 0);
-            if (bytesReaded == -1)
+            if (bytesReaded < 1)
                 if (readedBuf.str().empty())
                     return std::nullopt;
                 else
-                    break;
+                    return readedBuf.str();
         }catch(...) {
             return std::nullopt;
         }
