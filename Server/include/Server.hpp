@@ -25,6 +25,8 @@ class Server {
         void loop();
 
         void addValidator(ValidatorType validator) noexcept;
+        
+        void signalHandled();
 
     private:
         void _initializeSocket(unsigned short port);

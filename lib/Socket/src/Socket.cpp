@@ -148,8 +148,9 @@ bool Socket::setReuseAddr(bool status) noexcept {
 }
 
 bool Socket::setNonBlocking(bool status) noexcept {
+    unsigned long flag = status;
 #ifdef WIN32
-    return ioctlsocket(this->m_sock, FIONBIO, reinterpret_cast<unsigned long *>(&status));
+    return ioctlsocket(this->m_sock, FIONBIO, reinterpret_cast<unsigned long *>(&flag)) == 0;
 #else
     int flags = fcntl(this->m_sock, F_GETFL, 0);
     if (flags == -1) return false;
